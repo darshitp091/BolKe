@@ -27,6 +27,7 @@ const ShopAdmin = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('details'); // 'details', 'products', 'design'
+  const [selectedTheme, setSelectedTheme] = useState('modern-saffron');
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   useEffect(() => {
@@ -37,7 +38,14 @@ const ShopAdmin = () => {
           fetch(`/api/shops/${shopId}/products`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
-        if (shopRes.ok) setShop(await shopRes.json());
+        if (shopRes.ok) {
+          const shopData = await shopRes.json();
+          setShop(shopData);
+          if (shopData.config_json) {
+            const config = JSON.parse(shopData.config_json);
+            setSelectedTheme(config.theme || 'modern-saffron');
+          }
+        }
         if (productsRes.ok) setProducts(await productsRes.json());
       } catch (err) {
         console.error(err);
@@ -99,6 +107,40 @@ const ShopAdmin = () => {
       }
     } catch (err) {
       setMessage({ type: 'error', text: 'Failed to save product.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const themes = [
+    { id: 'modern-saffron', name: 'Premium Saffron', color: '#F15A24', description: 'Royal Indian feel with saffron accents.' },
+    { id: 'royal-blue', name: 'Corporate Blue', color: '#2563EB', description: 'Professional and trust-building blue.' },
+    { id: 'minimal-dark', name: 'Sleek Dark', color: '#ffffff', description: 'Modern dark theme for high-end brands.' },
+    { id: 'nature-green', name: 'Organic Green', color: '#10B981', description: 'Fresh look for groceries and boutiques.' },
+  ];
+
+  const handleThemeUpdate = async (themeId: string) => {
+    setSelectedTheme(themeId);
+    setIsSaving(true);
+    try {
+      const config = shop.config_json ? JSON.parse(shop.config_json) : {};
+      config.theme = themeId;
+      
+      const res = await fetch(`/api/shops/${shopId}/theme`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ config_json: config })
+      });
+      
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Design updated!' });
+        setShop({ ...shop, config_json: JSON.stringify(config) });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to update design.' });
     } finally {
       setIsSaving(false);
     }
@@ -284,12 +326,57 @@ const ShopAdmin = () => {
             )}
 
             {activeTab === 'design' && (
-              <div className="text-center py-20">
-                <Layout className="mx-auto text-text-light/20 mb-6" size={64} />
-                <h3 className="text-2xl font-display font-black text-white mb-2">Design Customization</h3>
-                <p className="text-text-light/40 font-bold max-w-md mx-auto">
-                  Coming soon! You will be able to change your website theme, colors, and fonts here.
-                </p>
+              <div className="space-y-12">
+                <div>
+                  <h3 className="text-2xl font-display font-black text-white mb-2">Choose Your Vibe</h3>
+                  <p className="text-text-light/40 font-bold mb-8">Apni dukan ka rang aur style choose karein.</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {themes.map((theme) => (
+                      <button
+                        key={theme.id}
+                        onClick={() => handleThemeUpdate(theme.id)}
+                        className={`p-6 rounded-[2rem] border-2 text-left transition-all ${
+                          selectedTheme === theme.id 
+                            ? 'bg-white/10 border-accent-saffron shadow-xl shadow-accent-saffron/10' 
+                            : 'bg-white/5 border-transparent hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-12 h-12 rounded-xl flex items-center justify-center border border-white/10" style={{ backgroundColor: theme.color + '20' }}>
+                            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: theme.color }}></div>
+                          </div>
+                          <div>
+                            <div className="text-white font-black">{theme.name}</div>
+                            <div className="text-text-light/40 text-xs font-bold uppercase tracking-widest">{theme.id}</div>
+                          </div>
+                          {selectedTheme === theme.id && <div className="ml-auto bg-accent-saffron text-bg-base p-1 rounded-full"><CheckCircle2 size={16} /></div>}
+                        </div>
+                        <p className="text-text-light/60 text-sm font-bold">{theme.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-accent-saffron/5 border border-accent-saffron/20 p-8 rounded-[2.5rem]">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-12 h-12 bg-accent-saffron/10 text-accent-saffron rounded-2xl flex items-center justify-center">
+                      <Layout size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-display font-black text-white">Live Preview</h4>
+                      <p className="text-text-light/40 text-sm font-bold">See how your dukan looks right now.</p>
+                    </div>
+                  </div>
+                  <a 
+                    href={`/s/${shop?.slug}`}
+                    target="_blank"
+                    className="w-full bg-white text-bg-base py-4 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-accent-saffron hover:text-white transition-all shadow-xl"
+                  >
+                    View Live Website
+                    <ExternalLink size={18} />
+                  </a>
+                </div>
               </div>
             )}
           </div>

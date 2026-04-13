@@ -6,9 +6,9 @@ import dotenv from "dotenv";
 import multer from "multer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { Groq } from "groq-sdk";
 import Stripe from "stripe";
 import db from "./db.js";
+import localAI from "./local_ai.js";
 
 dotenv.config();
 
@@ -46,6 +46,18 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // --- SUBDOMAIN MIDDLEWARE ---
+  app.use((req: any, res, next) => {
+    const host = req.headers.host || "";
+    const mainDomain = process.env.MAIN_DOMAIN || "localhost:3000";
+    
+    if (host !== mainDomain && host.endsWith(mainDomain)) {
+      const subdomain = host.replace(`.${mainDomain}`, "");
+      req.subdomain = subdomain;
+    }
+    next();
+  });
 
   // --- AUTH ROUTES ---
 
@@ -88,51 +100,23 @@ async function startServer() {
 
   // --- SHOP ROUTES ---
 
-  app.post("/api/generate-site", authenticateToken, upload.single('audio'), async (req: any, res) => {
+  app.post("/api/generate-site", authenticateToken, upload.single('audio'), async (req: any, res: Response) => {
     try {
       const audioFile = req.file;
       if (!audioFile) return res.status(400).json({ message: "No audio uploaded" });
 
-      let transcription = "Mera naam Ramesh hai. Meri mithai ki dukan hai Jaipur mein. Naam hai Ramesh Sweets.";
-      let shopData = {
-        name: "Ramesh Sweets & Namkeen",
-        category: "Mithai Ki Dukan",
-        location: "Jaipur, Rajasthan",
-        description: "Asli Rajasthani swaad, ab online!"
-      };
+      // 1. Transcription (Local Whisper)
+      const transcription = await localAI.transcribeAudio(audioFile.buffer);
 
-      // Real AI Integration if API Key exists
-      if (process.env.GROQ_API_KEY) {
-        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-        
-        // 1. Transcription
-        const transcriptionResult = await groq.audio.transcriptions.create({
-          file: new File([audioFile.buffer], "recording.webm", { type: "audio/webm" }) as any,
-          model: "whisper-large-v3",
-        });
-        transcription = transcriptionResult.text;
-
-        // 2. Extraction
-        const completion = await groq.chat.completions.create({
-          messages: [
-            { role: "system", content: "Extract shop name, category, location, and a short description from the text. Return JSON only." },
-            { role: "user", content: transcription }
-          ],
-          model: "llama3-70b-8192",
-          response_format: { type: "json_object" }
-        });
-        shopData = JSON.parse(completion.choices[0].message.content || "{}");
-      } else {
-        // Mock delay
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      // 2. Extraction (Local Ollama/Llama3)
+      const shopData = await localAI.extractShopData(transcription);
 
       const slug = (shopData.name || "my-shop").toLowerCase().replace(/ /g, "-") + "-" + Math.random().toString(36).substring(7);
       
-      const stmt = db.prepare("INSERT INTO shops (user_id, name, slug, category, location, description, config_json) VALUES (?, ?, ?, ?, ?, ?, ?)");
-      stmt.run(req.user.id, shopData.name, slug, shopData.category, shopData.location, shopData.description, JSON.stringify(shopData));
+      const stmt = db.prepare("INSERT INTO shops (user_id, name, slug, category, location, description, whatsapp_number, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+      stmt.run(req.user.id, shopData.name, slug, shopData.category, shopData.location, shopData.description, shopData.whatsapp_number, JSON.stringify(shopData));
 
-      res.json({ success: true, slug, details: shopData, url: `https://${slug}.bolke.in` });
+      res.json({ success: true, slug, details: shopData, url: `http://${slug}.${process.env.MAIN_DOMAIN || 'localhost:3000'}` });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "AI processing failed" });
@@ -144,13 +128,26 @@ async function startServer() {
     res.json(shops);
   });
 
-  app.get("/api/shops/:id", authenticateToken, (req: any, res) => {
+  app.get("/api/shops/:id", authenticateToken, (req: any, res: Response) => {
     const shop = db.prepare("SELECT * FROM shops WHERE id = ? AND user_id = ?").get(req.params.id, req.user.id);
     if (!shop) return res.status(404).json({ message: "Shop not found" });
     res.json(shop);
   });
 
-  app.put("/api/shops/:id", authenticateToken, (req: any, res) => {
+  // --- PUBLIC SHOP API ---
+  app.get("/api/public/shop/:slug", (req, res) => {
+    try {
+      const shop: any = db.prepare("SELECT * FROM shops WHERE slug = ?").get(req.params.slug);
+      if (!shop) return res.status(404).json({ message: "Shop not found" });
+      
+      const products = db.prepare("SELECT * FROM products WHERE shop_id = ?").all(shop.id);
+      res.json({ shop, products });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/shops/:id", authenticateToken, (req: any, res: Response) => {
     const { name, category, location, description, whatsapp_number } = req.body;
     try {
       db.prepare("UPDATE shops SET name = ?, category = ?, location = ?, description = ?, whatsapp_number = ? WHERE id = ? AND user_id = ?")
@@ -158,6 +155,27 @@ async function startServer() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Update failed" });
+    }
+  });
+
+  app.delete("/api/shops/:id", authenticateToken, (req: any, res: Response) => {
+    try {
+      db.prepare("DELETE FROM shops WHERE id = ? AND user_id = ?").run(req.params.id, req.user.id);
+      db.prepare("DELETE FROM products WHERE shop_id = ?").run(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Delete failed" });
+    }
+  });
+
+  app.put("/api/shops/:id/theme", authenticateToken, (req: any, res: Response) => {
+    const { config_json } = req.body;
+    try {
+      db.prepare("UPDATE shops SET config_json = ? WHERE id = ? AND user_id = ?")
+        .run(JSON.stringify(config_json), req.params.id, req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Theme update failed" });
     }
   });
 
@@ -177,7 +195,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/products/:id", authenticateToken, (req: any, res) => {
+  app.put("/api/products/:id", authenticateToken, (req: any, res: Response) => {
     const { name, price, description, image_url, category } = req.body;
     try {
       db.prepare("UPDATE products SET name = ?, price = ?, description = ?, image_url = ?, category = ? WHERE id = ?")
@@ -185,6 +203,15 @@ async function startServer() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Update failed" });
+    }
+  });
+
+  app.delete("/api/products/:id", authenticateToken, (req: any, res: Response) => {
+    try {
+      db.prepare("DELETE FROM products WHERE id = ?").run(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Delete failed" });
     }
   });
 
@@ -199,7 +226,7 @@ async function startServer() {
       const stmt = db.prepare("INSERT INTO shops (user_id, name, slug, category, location, description, whatsapp_number, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
       stmt.run(req.user.id, name, slug, category, location, description, whatsapp_number, JSON.stringify({ name, category, location, description, language }));
 
-      res.json({ success: true, slug, url: `https://${slug}.bolke.in` });
+      res.json({ success: true, slug, url: `http://${slug}.${process.env.MAIN_DOMAIN || 'localhost:3000'}` });
     } catch (error) {
       res.status(500).json({ message: "Generation failed" });
     }

@@ -7,6 +7,11 @@ import Auth from './pages/Auth';
 import LegalPage from './pages/LegalPage';
 import Dashboard from './pages/Dashboard';
 import ShopAdmin from './pages/ShopAdmin';
+import PublicShop from './pages/PublicShop';
+import FormBuilderPage from './pages/FormBuilderPage';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import NotFound from './pages/NotFound';
 
 import { AuthProvider } from './context/AuthContext';
 
@@ -41,12 +46,17 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/dashboard/edit/:shopId" element={<ShopAdmin />} />
+          <Route path="/form-builder" element={<FormBuilderPage />} />
+          <Route path="/s/:slug" element={<PublicShop />} />
           <Route path="/privacy" element={<LegalPage />} />
           <Route path="/terms" element={<LegalPage />} />
           <Route path="/security" element={<LegalPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
     </AuthProvider>

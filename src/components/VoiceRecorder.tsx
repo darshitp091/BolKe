@@ -1,7 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mic, Square, Loader2, CheckCircle2, AlertCircle, RefreshCcw, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { MOCK_SHOPS, generateMockFromText } from '../services/mockData';
 
 interface VoiceRecorderProps {
   onComplete: (data: any) => void;
@@ -14,6 +12,7 @@ const VoiceRecorder = ({ onComplete }: VoiceRecorderProps) => {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [processingStep, setProcessingStep] = useState(0);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -38,6 +37,27 @@ const VoiceRecorder = ({ onComplete }: VoiceRecorderProps) => {
       mediaRecorder.start();
       setIsRecording(true);
       setError(null);
+
+      // --- HACKATHON WOW FACTOR: Real-time keyword detection ---
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'hi-IN'; // Support Hindi/English detection
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event: any) => {
+          const transcript = Array.from(event.results)
+            .map((result: any) => result[0])
+            .map((result: any) => result.transcript)
+            .join('');
+          
+          // Seed the mock generator with what the user is actually saying!
+          (window as any).lastTranscript = transcript;
+        };
+        recognition.start();
+        (window as any).recognition = recognition;
+      }
     } catch (err) {
       setError("Microphone access nahi mila. Please settings check karein.");
     }
@@ -48,35 +68,40 @@ const VoiceRecorder = ({ onComplete }: VoiceRecorderProps) => {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      if ((window as any).recognition) (window as any).recognition.stop();
     }
   };
 
   const processAudio = async (blob: Blob) => {
     setIsProcessing(true);
+    setProcessingStep(0);
     
-    const formData = new FormData();
-    formData.append('audio', blob, 'recording.webm');
+    // Demo Mock Steps
+    const steps = [
+      "Awaaz pehchan raha hoon...",
+      "Dukan ki details nikaal raha hoon...",
+      "Premium design taiyar ho raha hai...",
+      "WhatsApp integration set kar raha hoon...",
+      "Aapki dukan online ho rahi hai!"
+    ];
 
-    try {
-      const response = await fetch('/api/generate-site', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        setResult(data);
-      } else {
-        setError(data.message || "AI processing mein error aaya. Phir se try karein.");
-      }
-    } catch (err) {
-      setError("Server se connect nahi ho paaye. Check your internet.");
-    } finally {
-      setIsProcessing(false);
+    for (let i = 0; i < steps.length; i++) {
+      setProcessingStep(i);
+      await new Promise(r => setTimeout(r, 1200));
     }
+
+    // In prototype, we use the detect logic to pick a shop based on voice input
+    // (In demo, the user can say "Clothing boutique" and it will show the right one)
+    const transcript = (window as any).lastTranscript || "";
+    const mockShop = generateMockFromText(transcript);
+    
+    setResult({
+      success: true,
+      slug: mockShop.slug,
+      details: mockShop,
+      url: `/s/${mockShop.slug}`
+    });
+    setIsProcessing(false);
   };
 
   const reset = () => {
@@ -153,6 +178,16 @@ const VoiceRecorder = ({ onComplete }: VoiceRecorderProps) => {
                 <span>{error}</span>
               </div>
             )}
+
+            <p className="text-sm text-text-light/60 font-bold mb-2 h-6">
+              {isProcessing && [
+                "Awaaz pehchan raha hoon...",
+                "Dukan ki details nikaal raha hoon...",
+                "Premium design taiyar ho raha hai...",
+                "WhatsApp integration set kar raha hoon...",
+                "Aapki dukan online ho rahi hai!"
+              ][processingStep]}
+            </p>
 
             <p className="text-xs text-text-light/40 font-black uppercase tracking-widest">
               {isProcessing ? "AI Magic ho raha hai..." : isRecording ? "Sun raha hoon..." : "Button dabaiye aur boliye"}

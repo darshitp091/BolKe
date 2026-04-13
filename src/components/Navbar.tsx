@@ -51,13 +51,13 @@ const Navbar = () => {
         {/* Desktop Links */}
         <div className="hidden lg:flex items-center gap-6 xl:gap-8">
           {navLinks.map((link) => (
-            <a 
+            <Link 
               key={link.name} 
-              href={link.href}
+              to={window.location.pathname === '/' ? link.href : `/${link.href}`}
               className="text-xs xl:text-sm font-medium text-text-light/60 hover:text-accent-saffron transition-colors"
             >
               {link.name}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -100,14 +100,14 @@ const Navbar = () => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 top-[calc(36px+5rem)] bg-bg-base z-[100] p-6 flex flex-col gap-6 lg:hidden animate-in fade-in slide-in-from-top-4">
           {navLinks.map((link) => (
-            <a 
+            <Link 
               key={link.name} 
-              href={link.href}
+              to={window.location.pathname === '/' ? link.href : `/${link.href}`}
               className="text-xl font-display font-bold text-text-light hover:text-accent-saffron transition-colors"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               {link.name}
-            </a>
+            </Link>
           ))}
           {user ? (
             <Link 

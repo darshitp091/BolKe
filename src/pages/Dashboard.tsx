@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
-import { Globe, Settings, ExternalLink, Plus, CreditCard, Layout, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Globe, Settings, ExternalLink, Plus, CreditCard, Layout, Zap, X, Mic, FileText } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import VoiceRecorder from '../components/VoiceRecorder';
+import { MOCK_SHOPS } from '../services/mockData';
 
 const Dashboard = () => {
   const { user, token, logout } = useAuth();
   const [shops, setShops] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [creationMode, setCreationMode] = useState<'selection' | 'voice' | 'form'>('selection');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchShops = async () => {
@@ -19,10 +23,14 @@ const Dashboard = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setShops(data);
+          // Merge real shops with sample mock shops for demo
+          setShops([...data, MOCK_SHOPS[0], MOCK_SHOPS[1], MOCK_SHOPS[3]]);
+        } else {
+          // If server is down, show mock shops only
+          setShops([MOCK_SHOPS[0], MOCK_SHOPS[1], MOCK_SHOPS[3]]);
         }
       } catch (err) {
-        console.error(err);
+        setShops([MOCK_SHOPS[0], MOCK_SHOPS[1], MOCK_SHOPS[3]]);
       } finally {
         setIsLoading(false);
       }
@@ -59,7 +67,13 @@ const Dashboard = () => {
           <div className="lg:col-span-2 space-y-8">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-display font-black text-white">Aapki Websites</h2>
-              <button className="bg-accent-saffron text-bg-base px-6 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-accent-gold transition-all">
+              <button 
+                onClick={() => {
+                  setCreationMode('selection');
+                  setShowModal(true);
+                }}
+                className="bg-accent-saffron text-bg-base px-6 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-accent-gold transition-all"
+              >
                 <Plus size={20} />
                 Nayi Website
               </button>
@@ -91,14 +105,14 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 w-full md:w-auto">
-                        <a 
-                          href={`https://${shop.slug}.bolke.in`} 
+                        <Link 
+                          to={`/s/${shop.slug}`} 
                           target="_blank" 
                           className="flex-1 md:flex-none bg-white/5 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
                         >
                           <ExternalLink size={18} />
                           Visit
-                        </a>
+                        </Link>
                         <Link 
                           to={`/dashboard/edit/${shop.id}`}
                           className="flex-1 md:flex-none bg-accent-saffron/10 text-accent-saffron px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-accent-saffron/20 transition-all"
@@ -162,6 +176,79 @@ const Dashboard = () => {
       </div>
 
       <Footer />
+
+      {/* Creation Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-bg-base/90 backdrop-blur-md"
+            ></motion.div>
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-bg-surface border border-border-dark rounded-[3rem] shadow-2xl overflow-hidden"
+            >
+              <button 
+                onClick={() => setShowModal(false)}
+                className="absolute top-8 right-8 text-text-light/40 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="p-12">
+                {creationMode === 'selection' && (
+                  <div className="text-center">
+                    <h2 className="text-4xl font-display font-black text-white mb-4">Kaise Banana Chahte Hain?</h2>
+                    <p className="text-text-light/60 font-bold mb-12">Chonhiye aapke liye sabse aasaan tareeka.</p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <button 
+                        onClick={() => setCreationMode('voice')}
+                        className="group p-8 bg-white/5 border border-white/10 rounded-[2.5rem] text-left hover:border-accent-saffron transition-all"
+                      >
+                        <div className="w-16 h-16 bg-accent-saffron/10 text-accent-saffron rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                          <Mic size={32} />
+                        </div>
+                        <h4 className="text-2xl font-display font-black text-white mb-2">BolKe Banao</h4>
+                        <p className="text-text-light/40 font-bold text-sm">Bas apni dukan ke baare mein boliye aur AI website bana dega.</p>
+                      </button>
+
+                      <button 
+                        onClick={() => navigate('/form-builder')}
+                        className="group p-8 bg-white/5 border border-white/10 rounded-[2.5rem] text-left hover:border-accent-haldi transition-all"
+                      >
+                        <div className="w-16 h-16 bg-accent-haldi/10 text-accent-haldi rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                          <FileText size={32} />
+                        </div>
+                        <h4 className="text-2xl font-display font-black text-white mb-2">Likh Kar Banao</h4>
+                        <p className="text-text-light/40 font-bold text-sm">Ek simple form bhariye aur manually apni details daaliye.</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {creationMode === 'voice' && (
+                  <div className="py-4">
+                    <VoiceRecorder 
+                      onComplete={() => {
+                        setShowModal(false);
+                        window.location.reload();
+                      }} 
+                    />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
