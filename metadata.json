@@ -1,0 +1,5 @@
+{
+  "name": "BolKe — Bolo, Banao, Badho",
+  "description": "Voice-powered website builder for Indian small businesses. No coding, no English required.",
+  "requestFramePermissions": ["microphone"]
+}

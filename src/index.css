@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Noto+Sans:wght@300;400;500;600&family=Noto+Sans+Devanagari:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Baloo 2", cursive;
+  --font-sans: "Noto Sans", "Noto Sans Devanagari", sans-serif;
+
+  --color-bg-base: #0F0E17;
+  --color-bg-surface: #1A1829;
+  --color-bg-warm: #FFF8F0;
+  --color-accent-saffron: #E8732A;
+  --color-accent-gold: #F5A623;
+  --color-accent-haldi: #F7C948;
+  --color-text-light: #F2EFE9;
+  --color-text-muted: #A09E9A;
+  --color-text-dark: #1A1A2E;
+  --color-text-dark-muted: #6B6878;
+  --color-border-dark: rgba(255, 255, 255, 0.08);
+  --color-border-warm: rgba(232, 115, 42, 0.2);
+  --color-success: #2ECC71;
+  --color-danger: #E74C3C;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-base text-text-light font-sans selection:bg-accent-saffron selection:text-white;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer utilities {
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(232, 115, 42, 0.1) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .bazaar-pattern {
+    position: relative;
+    background-color: #0F0E17;
+  }
+
+  .bazaar-pattern::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("https://www.transparenttextures.com/patterns/az-subtle.png");
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .ink-texture {
+    position: relative;
+  }
+
+  .ink-texture::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("https://www.transparenttextures.com/patterns/stardust.png");
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .diagonal-divider-top {
+    clip-path: polygon(0 5%, 100% 0, 100% 100%, 0 100%);
+  }
+
+  .diagonal-divider-bottom {
+    clip-path: polygon(0 0, 100% 0, 100% 95%, 0 100%);
+  }
+
+  .hand-drawn-underline {
+    position: relative;
+    display: inline-block;
+  }
+
+  .hand-drawn-underline::after {
+    content: "";
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 8px;
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='10' viewBox='0 0 100 10' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 5 Q 25 0, 50 5 T 100 5' fill='none' stroke='%23E8732A' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    opacity: 0.8;
+  }
+}
+
+/* Custom Animations */
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marqueeScroll 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Smooth Scroll Fixes */
+html.lenis {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
